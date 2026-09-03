@@ -27,12 +27,7 @@ variable "peer_cidr" {
 variable "gateway_private_key" {
   type        = string
   sensitive   = true
-  description = "WireGuard private key for this AWS-side gateway. Generate once with `wg genkey` (e.g. `docker run --rm alpine sh -c 'apk add --no-cache wireguard-tools >/dev/null; wg genkey'`) and keep it stable across applies - this module does not generate it, to keep the module usable in CI without a docker/wg-tools dependency at plan time."
-}
-
-variable "gateway_public_key" {
-  type        = string
-  description = "Public counterpart of gateway_private_key (`wg pubkey <<< $private_key`). Kept as a separate input rather than derived, for the same CI-portability reason - deriving it would require shelling out to `wg` at plan time."
+  description = "WireGuard private key for this AWS-side gateway. Generate once with `wg genkey` (e.g. `docker run --rm alpine sh -c 'apk add --no-cache wireguard-tools >/dev/null; wg genkey'`) and keep it stable across applies. The public counterpart is derived internally (see data.external.gateway_pubkey in main.tf) - this module needs `docker` available wherever you run terraform plan/apply."
 }
 
 variable "peer_public_key" {

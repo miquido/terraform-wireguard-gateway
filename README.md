@@ -5,15 +5,19 @@ so that whatever's behind `route_table_ids` on the AWS side can reach `peer_cidr
 other end of the tunnel (an on-prem network, an office docker network, another cloud, ...),
 and vice versa.
 
-Deliberately **not** fully self-contained on the key-generation front: it takes both
-`gateway_private_key` and `gateway_public_key` as inputs instead of generating them via a
-`local-exec` provisioner, so this module has no hidden `docker`/`wg` dependency at plan
-time and stays usable in CI. Generate the keypair once, keep it stable across applies:
+Takes `gateway_private_key` as an input rather than generating it, so the keypair stays
+stable across applies (this module doesn't own its own state file for it). Generate it
+once:
 
 ```bash
 docker run --rm alpine sh -c 'apk add --no-cache wireguard-tools >/dev/null; wg genkey' > gateway.key
-docker run --rm -i alpine sh -c 'apk add --no-cache wireguard-tools >/dev/null; wg pubkey' < gateway.key > gateway.pub
 ```
+
+The public counterpart is derived internally at plan time (`data.external.gateway_pubkey`
+in `main.tf`, a pure function of the private key you already fixed - not new random state)
+and exposed as the `gateway_public_key` output. This means **`docker` must be available
+wherever you run `terraform plan`/`apply`** - fine interactively, a real constraint if you
+run this module from a docker-less CI runner.
 
 ## Development
 
@@ -48,7 +52,6 @@ module "wireguard" {
   peer_cidr = "172.20.0.0/16" # the on-prem docker network's subnet
 
   gateway_private_key = var.wg_gateway_private_key
-  gateway_public_key  = var.wg_gateway_public_key
   peer_public_key     = var.wg_office_public_key
 }
 ```
@@ -79,7 +82,6 @@ module "wireguard" {
   peer_cidr = "10.50.0.0/16" # the on-prem network
 
   gateway_private_key = var.wg_gateway_private_key
-  gateway_public_key  = var.wg_gateway_public_key
   peer_public_key     = var.wg_office_public_key
 }
 ```
@@ -129,12 +131,14 @@ first time:
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.5.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_external"></a> [external](#requirement\_external) | ~> 2.3 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 6.62.0 |
+| <a name="provider_external"></a> [external](#provider\_external) | 2.4.1 |
 
 ## Modules
 
@@ -157,8 +161,7 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_allowed_ingress_cidrs"></a> [allowed\_ingress\_cidrs](#input\_allowed\_ingress\_cidrs) | CIDRs allowed to reach the WireGuard UDP port. Defaults wide open since WireGuard silently drops unauthenticated packets regardless of source; narrow this down if the peer's source IP is static. | `list(string)` | <pre>[<br/>  "0.0.0.0/0"<br/>]</pre> | no |
-| <a name="input_gateway_private_key"></a> [gateway\_private\_key](#input\_gateway\_private\_key) | WireGuard private key for this AWS-side gateway. Generate once with `wg genkey` (e.g. `docker run --rm alpine sh -c 'apk add --no-cache wireguard-tools >/dev/null; wg genkey'`) and keep it stable across applies - this module does not generate it, to keep the module usable in CI without a docker/wg-tools dependency at plan time. | `string` | n/a | yes |
-| <a name="input_gateway_public_key"></a> [gateway\_public\_key](#input\_gateway\_public\_key) | Public counterpart of gateway\_private\_key (`wg pubkey <<< $private_key`). Kept as a separate input rather than derived, for the same CI-portability reason - deriving it would require shelling out to `wg` at plan time. | `string` | n/a | yes |
+| <a name="input_gateway_private_key"></a> [gateway\_private\_key](#input\_gateway\_private\_key) | WireGuard private key for this AWS-side gateway. Generate once with `wg genkey` (e.g. `docker run --rm alpine sh -c 'apk add --no-cache wireguard-tools >/dev/null; wg genkey'`) and keep it stable across applies. The public counterpart is derived internally (see data.external.gateway\_pubkey in main.tf) - this module needs `docker` available wherever you run terraform plan/apply. | `string` | n/a | yes |
 | <a name="input_gateway_tunnel_address"></a> [gateway\_tunnel\_address](#input\_gateway\_tunnel\_address) | Address of the gateway's own wg0 interface, in the point-to-point tunnel subnet (distinct from both real networks on either side). | `string` | `"10.100.0.1/30"` | no |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | Gateway instance size. It only routes/encrypts packets, t4g.nano is plenty for test/sandbox traffic. | `string` | `"t4g.nano"` | no |
 | <a name="input_name"></a> [name](#input\_name) | Prefix used for all resource names/tags created by this module. | `string` | `"wireguard"` | no |
@@ -178,7 +181,8 @@ No modules.
 | <a name="output_gateway_endpoint"></a> [gateway\_endpoint](#output\_gateway\_endpoint) | n/a |
 | <a name="output_gateway_instance_id"></a> [gateway\_instance\_id](#output\_gateway\_instance\_id) | n/a |
 | <a name="output_gateway_public_ip"></a> [gateway\_public\_ip](#output\_gateway\_public\_ip) | n/a |
-| <a name="output_onprem_compose_snippet"></a> [onprem\_compose\_snippet](#output\_onprem\_compose\_snippet) | Paste into the on-prem docker-compose.yml as a new service. See the snippet's own header comment for the two things you still need to fill in (WG\_OFFICE\_PRIVATE\_KEY and this module's peer\_public\_key input). |
+| <a name="output_gateway_public_key"></a> [gateway\_public\_key](#output\_gateway\_public\_key) | Derived from gateway\_private\_key. This is what the on-prem peer's config needs as its WG\_AWS\_PUBLIC\_KEY - already baked into onprem\_compose\_snippet, exposed here too in case you need it standalone. |
+| <a name="output_onprem_compose_snippet"></a> [onprem\_compose\_snippet](#output\_onprem\_compose\_snippet) | Paste into the on-prem docker-compose.yml as a new service. See the snippet's own header comment for the one thing you still need to fill in (WG\_OFFICE\_PRIVATE\_KEY). |
 <!-- END_TF_DOCS -->
 
 ## License

@@ -7,6 +7,19 @@ data "aws_vpc" "this" {
   id = var.vpc_id
 }
 
+# Derives the gateway's own public key from gateway_private_key instead of asking for it
+# as a separate input - it's a pure function of an already-fixed value (no randomness), so
+# this is a safe use of `external`, not the kind of "generates new state on every apply"
+# footgun `local-exec`/`external` usually are. Requires `docker` wherever you run
+# terraform plan/apply - fine for interactive use, a real constraint if you run this
+# module from a docker-less CI runner.
+data "external" "gateway_pubkey" {
+  program = ["${path.module}/scripts/derive-pubkey.sh"]
+  query = {
+    private_key = var.gateway_private_key
+  }
+}
+
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["amazon"]
