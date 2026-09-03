@@ -1,0 +1,43 @@
+# Paste this as a service into the on-prem docker-compose.yml, in whichever project's
+# network needs to become reachable from AWS (the peer_cidr network reachable from
+# route_table_ids side).
+#
+# Requires two things you provide yourself:
+#   - WG_OFFICE_PRIVATE_KEY: this side's own WireGuard private key. Generate ONCE with
+#     `wg genkey` and keep it stable (e.g. as a CI/CD variable) - do not regenerate it on
+#     every deploy, or the AWS gateway's peer_public_key will go stale.
+#   - Its public counterpart (`wg pubkey <<< $WG_OFFICE_PRIVATE_KEY`) must be set as this
+#     module's peer_public_key input.
+#
+# On first boot the container prints its own public key to its logs - handy to confirm it
+# matches what you fed into peer_public_key.
+  wireguard:
+    image: alpine:3.20
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    environment:
+      WG_PRIVATE_KEY: $${WG_OFFICE_PRIVATE_KEY}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        apk add --no-cache wireguard-tools iptables
+        cat > /etc/wireguard/wg0.conf <<EOF
+        [Interface]
+        Address = ${office_tunnel_address}
+        PrivateKey = $$WG_PRIVATE_KEY
+
+        [Peer]
+        PublicKey = ${gateway_public_key}
+        Endpoint = ${gateway_endpoint}
+        AllowedIPs = ${aws_cidr}
+        PersistentKeepalive = 25
+        EOF
+        chmod 600 /etc/wireguard/wg0.conf
+        wg-quick up wg0
+        echo "own public key: $$(wg pubkey <<< $$WG_PRIVATE_KEY)"
+        iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+        tail -f /dev/null
+    restart: unless-stopped
