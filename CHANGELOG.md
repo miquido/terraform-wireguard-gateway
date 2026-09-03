@@ -1,3 +1,10 @@
+# [2.1.0](https://gitlab.miquido.com/miquido/terraform/terraform-wireguard-gateway/compare/v2.0.0...v2.1.0) (2026-09-03)
+
+
+### Features
+
+* add gen-keys.sh to generate both tunnel keypairs at once ([6da9225](https://gitlab.miquido.com/miquido/terraform/terraform-wireguard-gateway/commit/6da92253568240f757d52a3cb89142856c0b36f6))
+
 # [2.0.0](https://gitlab.miquido.com/miquido/terraform/terraform-wireguard-gateway/compare/v1.0.1...v2.0.0) (2026-09-03)
 
 
