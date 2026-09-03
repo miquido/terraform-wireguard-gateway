@@ -1,3 +1,10 @@
+## [2.1.1](https://gitlab.miquido.com/miquido/terraform/terraform-wireguard-gateway/compare/v2.1.0...v2.1.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* replace bash here-string with POSIX-sh-compatible pipe ([0b1fdb0](https://gitlab.miquido.com/miquido/terraform/terraform-wireguard-gateway/commit/0b1fdb0b561e2e2e2ec033895b46559d58b852cd))
+
 # [2.1.0](https://gitlab.miquido.com/miquido/terraform/terraform-wireguard-gateway/compare/v2.0.0...v2.1.0) (2026-09-03)
 
 
