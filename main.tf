@@ -145,10 +145,16 @@ resource "aws_eip" "this" {
 # on whatever route table resource you already have: if that table also has an inline
 # `route { ... }` argument, it treats itself as the sole source of truth and deletes
 # anything not declared there on every apply, including this one.
+#
+# count, not for_each: route_table_ids commonly comes straight from a VPC module's output
+# (e.g. terraform-vpc's public_route_table_ids) on a from-scratch apply, where the route
+# table IDs aren't known until apply. for_each over a set built from unknown values fails
+# at plan time ("Invalid for_each argument"); count only needs the list's length, which is
+# known even when its elements aren't.
 resource "aws_route" "to_peer" {
-  for_each = toset(var.route_table_ids)
+  count = length(var.route_table_ids)
 
-  route_table_id         = each.value
+  route_table_id         = var.route_table_ids[count.index]
   destination_cidr_block = var.peer_cidr
   network_interface_id   = aws_instance.this.primary_network_interface_id
 }
