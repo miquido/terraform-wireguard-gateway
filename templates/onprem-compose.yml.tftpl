@@ -37,7 +37,7 @@
         EOF
         chmod 600 /etc/wireguard/wg0.conf
         wg-quick up wg0
-        echo "own public key: $$(wg pubkey <<< $$WG_PRIVATE_KEY)"
+        echo "own public key: $$(echo "$$WG_PRIVATE_KEY" | wg pubkey)"
         iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
         tail -f /dev/null
     restart: unless-stopped
