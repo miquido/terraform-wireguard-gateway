@@ -6,18 +6,20 @@ other end of the tunnel (an on-prem network, an office docker network, another c
 and vice versa.
 
 Takes `gateway_private_key` as an input rather than generating it, so the keypair stays
-stable across applies (this module doesn't own its own state file for it). Generate it
-once:
+stable across applies (this module doesn't own its own state file for it). `scripts/gen-keys.sh`
+generates both keypairs this tunnel needs (gateway side + on-prem side) in one go and
+labels each value by which input/env var it goes into:
 
 ```bash
-docker run --rm alpine sh -c 'apk add --no-cache wireguard-tools >/dev/null; wg genkey' > gateway.key
+./scripts/gen-keys.sh
 ```
 
-The public counterpart is derived internally at plan time (`data.external.gateway_pubkey`
-in `main.tf`, a pure function of the private key you already fixed - not new random state)
-and exposed as the `gateway_public_key` output. This means **`docker` must be available
-wherever you run `terraform plan`/`apply`** - fine interactively, a real constraint if you
-run this module from a docker-less CI runner.
+The gateway's public counterpart is derived internally at plan time
+(`data.external.gateway_pubkey` in `main.tf`, a pure function of the private key you
+already fixed - not new random state) and exposed as the `gateway_public_key` output. This
+means **`docker` must be available wherever you run `terraform plan`/`apply`** (also true
+of `gen-keys.sh` itself) - fine interactively, a real constraint if you run this module
+from a docker-less CI runner.
 
 ## Development
 
@@ -29,12 +31,14 @@ make lint   # lint terraform code
 
 ## Two-apply flow (both sides need each other's public key)
 
+0. `./scripts/gen-keys.sh` up front - generates both keypairs this tunnel needs at once, so
+   you're not blocked waiting on it between steps 1 and 2.
 1. First apply with `peer_public_key = ""` (the default) - stands up the gateway and gives
    you its public key/endpoint and a ready-to-paste on-prem docker-compose snippet via the
    `onprem_compose_snippet` output.
-2. Generate a keypair on the on-prem side the same way as above, drop the snippet into the
-   on-prem `docker-compose.yml`, deploy it. It prints its own public key to its container
-   logs on first boot.
+2. Drop the snippet into the on-prem `docker-compose.yml`, wire in the on-prem private key
+   from step 0, deploy it. It prints its own public key to its container logs on first
+   boot - confirm it matches step 0's peer public key.
 3. `terraform apply` again with `peer_public_key` set to that value. Done - traffic flows
    both ways.
 
