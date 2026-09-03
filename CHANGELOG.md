@@ -1,3 +1,15 @@
+# [2.0.0](https://gitlab.miquido.com/miquido/terraform/terraform-wireguard-gateway/compare/v1.0.1...v2.0.0) (2026-09-03)
+
+
+* fix!: derive gateway_public_key internally instead of requiring it as input ([ca65c51](https://gitlab.miquido.com/miquido/terraform/terraform-wireguard-gateway/commit/ca65c51094a7750c1bc247ef1f3f7697ec7b78b5))
+
+
+### BREAKING CHANGES
+
+* gateway_public_key is no longer a module input. Remove it
+from any module block; it's now available as the gateway_public_key output
+instead. Requires `docker` wherever terraform plan/apply runs.
+
 ## [1.0.1](https://gitlab.miquido.com/miquido/terraform/terraform-wireguard-gateway/compare/v1.0.0...v1.0.1) (2026-09-03)
 
 
